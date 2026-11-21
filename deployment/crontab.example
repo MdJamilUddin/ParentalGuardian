@@ -1,0 +1,7 @@
+# Install with:  crontab -e   (as the guardian user), then paste these lines. Adjust the path.
+# Health watchdog every 5 minutes
+*/5 * * * * bash /home/guardian/app/deployment/monitor.sh >> /home/guardian/monitor.log 2>&1
+# Database backup daily at 02:30 (keeps 14 days)
+30 2 * * * bash /home/guardian/app/deployment/backup.sh >> /home/guardian/backup.log 2>&1
+# Purge data older than the retention period daily at 03:00
+0 3 * * * cd /home/guardian/app/deployment && docker compose exec -T db psql -U guardian guardian < ../database/retention.sql >> /home/guardian/retention.log 2>&1

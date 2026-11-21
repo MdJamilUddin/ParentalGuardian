@@ -1,0 +1,33 @@
+# ---- secrets and local config: never commit these ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.keystore
+keystore.properties
+local.properties
+deployment/backups/
+*.sql.gz
+
+# ---- Python ----
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+
+# ---- Android / Gradle ----
+.gradle/
+build/
+.cxx/
+captures/
+.idea/
+*.iml
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.vscode/
+.gitattributes

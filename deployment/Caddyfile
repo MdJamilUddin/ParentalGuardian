@@ -1,0 +1,22 @@
+# Caddy gets and renews the HTTPS certificate automatically for {$DOMAIN}.
+{$DOMAIN} {
+	encode gzip
+
+	# https://DOMAIN/api/...  ->  backend (the /api prefix is removed)
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# everything else is the parent dashboard
+	handle {
+		root * /srv/dashboard
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+}

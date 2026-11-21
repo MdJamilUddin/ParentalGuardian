@@ -1,0 +1,70 @@
+# Run from this folder:  docker compose up -d --build
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"   # rotate logs so the disk can't fill up
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_DB: guardian
+      POSTGRES_USER: guardian
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guardian -d guardian"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://guardian:${DB_PASSWORD}@db:5432/guardian
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-1440}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+      CORS_ORIGINS: https://${DOMAIN}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_JSON: "true"
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # not published to the internet: only the web container can reach it
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../parent-web/dashboard:/srv/dashboard:ro
+      - ./dashboard-config.js:/srv/dashboard/config.js:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
