@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -6,11 +8,15 @@ from ..models.db import get_db
 from ..models.entities import BatteryReading, Device, LocationPoint, UsageRecord, utcnow
 from ..models.schemas import PairIn, PairOut, SyncIn, SyncOut
 from ..services.pairing import redeem_pairing_code
+from ..services.ratelimit import RateLimiter
+
+pair_limit = RateLimiter(10, 600)
 
 router = APIRouter(prefix="/device", tags=["device"])
+log = logging.getLogger("app.device")
 
 
-@router.post("/pair", response_model=PairOut)
+@router.post("/pair", response_model=PairOut, dependencies=[Depends(pair_limit)])
 def pair(body: PairIn, db: Session = Depends(get_db)):
     result = redeem_pairing_code(db, body.code, body.device_name)
     if not result:
@@ -35,5 +41,7 @@ def sync(body: SyncIn, device: Device = Depends(current_device), db: Session = D
             db.add(UsageRecord(device_id=device.id, package=u.package, app_label=u.app_label,
                                day=u.day, seconds=u.seconds))
     db.commit()
+    log.info("sync device=%s locations=%d usage=%d battery=%d", device.id,
+             len(body.locations), len(body.usage), len(body.battery))
     return SyncOut(accepted_locations=len(body.locations), accepted_usage=len(body.usage),
                    accepted_battery=len(body.battery), server_time=utcnow())
