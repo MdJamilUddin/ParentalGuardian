@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlalchemy>=2.0
+pydantic[email]>=2.6
+PyJWT>=2.8
+# psycopg2-binary>=2.9   # uncomment for PostgreSQL in production
+alembic>=1.13
