@@ -1,28 +1,34 @@
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 from app.config.settings import settings
 from app.models import entities  # noqa: F401
 from app.models.db import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 target_metadata = Base.metadata
 
 
+def _url() -> str:
+    # an explicit URL (tests, scripts) wins; otherwise use DATABASE_URL from the environment
+    return config.get_main_option("sqlalchemy.url") or settings.DATABASE_URL
+
+
 def run_migrations_offline():
-    context.configure(url=settings.DATABASE_URL, target_metadata=target_metadata, literal_binds=True)
+    context.configure(url=_url(), target_metadata=target_metadata, literal_binds=True,
+                      dialect_opts={"paramstyle": "named"})
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online():
-    engine = engine_from_config(config.get_section(config.config_ini_section), prefix="sqlalchemy.",
-                                poolclass=pool.NullPool)
+    engine = create_engine(_url(), poolclass=pool.NullPool)
     with engine.connect() as conn:
-        context.configure(connection=conn, target_metadata=target_metadata)
+        context.configure(connection=conn, target_metadata=target_metadata,
+                          render_as_batch=(conn.dialect.name == "sqlite"))
         with context.begin_transaction():
             context.run_migrations()
+    engine.dispose()
 
 
 if context.is_offline_mode():
