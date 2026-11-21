@@ -12,6 +12,11 @@ _ROOT = Path(__file__).resolve().parent.parent
 
 
 def alembic_config(url: str | None = None) -> Config:
+    if not (_ROOT / "migrations" / "env.py").exists():
+        raise RuntimeError(
+            f"Alembic folder not found at {_ROOT / 'migrations'}. Make sure backend/migrations is committed and "
+            "deployed (check with: git ls-files backend/migrations)."
+        )
     cfg = Config(str(_ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(_ROOT / "migrations"))
     cfg.set_main_option("sqlalchemy.url", (url or settings.DATABASE_URL).replace("%", "%%"))

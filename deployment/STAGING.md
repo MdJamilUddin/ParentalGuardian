@@ -1,5 +1,7 @@
 # Staging server: step by step
 
+No server or card for a VPS yet? Use **RENDER.md** instead (hosted platform, no server administration).
+
 Goal: a real server on the internet, with HTTPS, running exactly what production will run, where you can test
 with real phones. Use the same steps later for production (a second server and domain).
 
