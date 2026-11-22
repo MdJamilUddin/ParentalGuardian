@@ -1,37 +1,50 @@
-# ---- secrets and local config: never commit these ----
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---------- Database ----------
+*.db
+*.sqlite
+*.sqlite3
+guardian.db
+
+# ---------- Env / Secrets ----------
 .env
 .env.*
 !.env.example
-*.pem
-*.key
-*.jks
-*.keystore
-keystore.properties
-local.properties
-deployment/backups/
-*.sql.gz
 
-# ---- Python ----
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-*.db
+# ---------- Logs ----------
+*.log
+logs/
 
-# ---- Android / Gradle ----
-.gradle/
-build/
-.cxx/
-captures/
+# ---------- IDE ----------
+.vscode/
 .idea/
-*.iml
+*.swp
+*.swo
 
-# ---- OS / editor ----
+# ---------- OS ----------
 .DS_Store
 Thumbs.db
-.vscode/
 
-# ---- Firebase (never commit the service-account key; keep google-services.json local) ----
-google-services.json
-*firebase-adminsdk*.json
-service-account*.json
+# ---------- Build / Deploy ----------
+dist/
+build/
+*.apk
+*.aab
+.gradle/
+local.properties
+
+# ---------- Node (parent-web) ----------
+node_modules/
