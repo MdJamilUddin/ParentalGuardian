@@ -81,7 +81,9 @@ app.include_router(device.router)
 app.include_router(push.router)
 app.include_router(internal.router)
 
-
+@app.get("/", include_in_schema=False)
+def root():
+    return {"service": "ParentalGuardian API", "docs": "/docs", "health": "/health/ready"}
 @app.get("/health")
 def health():
     """Liveness: the process is up."""
