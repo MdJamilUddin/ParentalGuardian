@@ -19,6 +19,7 @@ fun ChildrenScreen(token: String, onOpen: (Int) -> Unit, onLogout: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var showAdd by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
+    var showAlerts by remember { mutableStateOf(false) }
 
     fun load() = scope.launch {
         io(onLogout) { Api.children(token) }
@@ -29,6 +30,7 @@ fun ChildrenScreen(token: String, onOpen: (Int) -> Unit, onLogout: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(20.dp).statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("My children", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = { showAlerts = true }) { Text("Alerts") }
             TextButton(onClick = onLogout) { Text("Log out") }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -48,6 +50,8 @@ fun ChildrenScreen(token: String, onOpen: (Int) -> Unit, onLogout: () -> Unit) {
         }
         Button(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth()) { Text("Add child") }
     }
+
+    if (showAlerts) NotificationsDialog(token, { showAlerts = false }, onLogout)
 
     if (showAdd) AlertDialog(
         onDismissRequest = { showAdd = false },

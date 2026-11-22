@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String,
-                        UniqueConstraint)
+                        UniqueConstraint, true)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -18,6 +18,8 @@ class Parent(Base):
     name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    notify_offline: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    notify_low_battery: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     children: Mapped[list["Child"]] = relationship(back_populates="parent", cascade="all, delete-orphan")
 
 
@@ -39,6 +41,8 @@ class Device(Base):
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     paired_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    stale_alert_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    low_battery_alert_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     child: Mapped[Child] = relationship(back_populates="devices")
 
 
@@ -92,3 +96,14 @@ class BatteryReading(Base):
     level: Mapped[int] = mapped_column(Integer)
     charging: Mapped[bool] = mapped_column(Boolean, default=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class PushToken(Base):
+    """An Android phone (FCM registration token) that receives a parent's notifications."""
+    __tablename__ = "push_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parent_id: Mapped[int] = mapped_column(ForeignKey("parents.id", ondelete="CASCADE"), index=True)
+    token: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    platform: Mapped[str] = mapped_column(String(20), default="android")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

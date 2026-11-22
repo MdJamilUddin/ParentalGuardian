@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import uuid
@@ -12,7 +13,8 @@ from .config.settings import settings
 from .logging_config import setup_logging
 from .migrate import run_migrations
 from .models.db import SessionLocal, get_db
-from .routes import auth, children, device
+from .routes import auth, children, device, internal, push
+from .services.alerts import run_alert_check
 from .services.retention import purge_old_data
 
 setup_logging()
@@ -25,13 +27,25 @@ if settings.SENTRY_DSN:  # optional error tracking; no personal data is attached
                     send_default_pii=False, traces_sample_rate=0.0)
 
 
+async def _alert_loop():
+    while True:
+        await asyncio.sleep(settings.ALERT_CHECK_SECONDS)
+        try:
+            await asyncio.to_thread(run_alert_check)
+        except Exception:
+            logging.getLogger("app.alerts").exception("alert check failed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if settings.AUTO_MIGRATE:
         run_migrations()
     with SessionLocal() as db:
         purge_old_data(db)
+    task = asyncio.create_task(_alert_loop()) if settings.ALERT_CHECK_SECONDS > 0 else None
     yield
+    if task:
+        task.cancel()
 
 
 app = FastAPI(title="ParentalGuardian API", version="0.2.0", lifespan=lifespan)
@@ -64,6 +78,8 @@ async def access_logging(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(children.router)
 app.include_router(device.router)
+app.include_router(push.router)
+app.include_router(internal.router)
 
 
 @app.get("/health")

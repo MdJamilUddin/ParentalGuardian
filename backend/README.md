@@ -30,3 +30,7 @@ Tables are created and updated by Alembic (`migrations/`). The app runs `alembic
 set `AUTO_MIGRATE=false` to disable. An old development `guardian.db` created before migrations existed is
 adopted automatically. After changing a model run `alembic revision --autogenerate -m "message"`.
 See `../database/README.md`.
+
+## Push notifications
+Parents get alerts when a phone stops reporting (2 h) or its battery is low (15%). Needs a Firebase project, see
+`../deployment/FIREBASE.md`. Without credentials the backend runs normally and just logs the alerts it would send.

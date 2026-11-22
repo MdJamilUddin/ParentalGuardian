@@ -4,6 +4,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Push notifications need app/google-services.json (see deployment/FIREBASE.md). Without it the app still builds
+// and runs, it just has no push.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.parentalguardian.parent"
     compileSdk = 34
@@ -53,5 +59,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-messaging")
     implementation("org.osmdroid:osmdroid-android:6.1.18") // OpenStreetMap, no API key needed
 }

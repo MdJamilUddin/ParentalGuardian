@@ -30,3 +30,8 @@ captures/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# ---- Firebase (never commit the service-account key; keep google-services.json local) ----
+google-services.json
+*firebase-adminsdk*.json
+service-account*.json

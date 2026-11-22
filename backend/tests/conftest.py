@@ -15,6 +15,7 @@ from app.models import entities  # noqa: E402,F401
 from app.models.db import Base, engine  # noqa: E402
 from app.routes import auth as auth_routes  # noqa: E402
 from app.routes import device as device_routes  # noqa: E402
+from app.routes import push as push_routes  # noqa: E402
 from util import bearer  # noqa: E402
 
 
@@ -23,7 +24,7 @@ def fresh_state():
     """Empty database and cleared rate limiters before every test."""
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    for limiter in (auth_routes.login_limit, auth_routes.register_limit, device_routes.pair_limit):
+    for limiter in (auth_routes.login_limit, auth_routes.register_limit, device_routes.pair_limit, push_routes.test_limit):
         limiter.hits.clear()
     yield
 
@@ -57,3 +58,24 @@ def paired(client, register):
             device_id=d["device_id"], device_token=d["device_token"], device=bearer(d["device_token"]),
         )
     return _make
+
+
+class FakeSender:
+    configured = True
+
+    def __init__(self):
+        self.calls = []
+        self.invalid = []
+
+    def send(self, tokens, title, body, data):
+        self.calls.append({"tokens": list(tokens), "title": title, "body": body, "data": data})
+        return list(self.invalid)
+
+
+@pytest.fixture
+def sender():
+    from app.services import push
+    fake = FakeSender()
+    push.set_sender(fake)
+    yield fake
+    push.set_sender(None)

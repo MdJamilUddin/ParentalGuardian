@@ -12,6 +12,8 @@ data class Loc(val lat: Double, val lng: Double, val accuracy: Double?, val at: 
 data class UsageItem(val pkg: String, val label: String?, val seconds: Int)
 data class Battery(val level: Int, val charging: Boolean, val at: String)
 data class PairingCode(val code: String, val expiresAt: String)
+data class NotifPrefs(val offline: Boolean, val lowBattery: Boolean, val devices: Int)
+data class PushTestResult(val sent: Int, val registered: Int, val configured: Boolean)
 
 object Api {
     class ApiError(val code: Int, message: String) : Exception(message)
@@ -104,5 +106,27 @@ object Api {
         if (t.isEmpty() || t == "null") return null
         val o = JSONObject(t)
         return Battery(o.getInt("level"), o.getBoolean("charging"), o.getString("recorded_at"))
+    }
+
+    // ---- push notifications
+    fun registerPushToken(token: String, fcmToken: String) {
+        call("PUT", "/me/push-token", JSONObject().put("token", fcmToken).put("platform", "android"), token)
+    }
+
+    fun unregisterPushToken(token: String, fcmToken: String) {
+        call("POST", "/me/push-token/unregister", JSONObject().put("token", fcmToken), token)
+    }
+
+    private fun prefs(o: JSONObject) = NotifPrefs(o.getBoolean("offline"), o.getBoolean("low_battery"), o.getInt("devices"))
+
+    fun notifPrefs(token: String): NotifPrefs = prefs(JSONObject(call("GET", "/me/notifications", null, token)))
+
+    fun setNotifPrefs(token: String, offline: Boolean, lowBattery: Boolean): NotifPrefs =
+        prefs(JSONObject(call("PUT", "/me/notifications",
+            JSONObject().put("offline", offline).put("low_battery", lowBattery), token)))
+
+    fun pushTest(token: String): PushTestResult {
+        val o = JSONObject(call("POST", "/me/push-test", null, token))
+        return PushTestResult(o.getInt("sent"), o.getInt("registered"), o.getBoolean("configured"))
     }
 }
