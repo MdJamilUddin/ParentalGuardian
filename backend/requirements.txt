@@ -6,3 +6,4 @@ PyJWT>=2.8
 alembic>=1.13
 psycopg2-binary>=2.9
 sentry-sdk>=2.0
+firebase-admin>=6.5
