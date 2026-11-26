@@ -44,7 +44,7 @@ def test_unregister_only_removes_own_token(client, register):
 
 def test_preferences_default_on_and_can_change(client, register):
     a = register()
-    assert client.get("/me/notifications", headers=a).json() == {"offline": True, "low_battery": True, "devices": 0}
+    assert client.get("/me/notifications", headers=a).json() == {"offline": True, "low_battery": True, "places": True, "devices": 0}
     r = client.put("/me/notifications", json={"offline": False, "low_battery": True}, headers=a)
     assert r.json()["offline"] is False
 

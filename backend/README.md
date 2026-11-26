@@ -34,3 +34,10 @@ See `../database/README.md`.
 ## Push notifications
 Parents get alerts when a phone stops reporting (2 h) or its battery is low (15%). Needs a Firebase project, see
 `../deployment/FIREBASE.md`. Without credentials the backend runs normally and just logs the alerts it would send.
+
+## Place alerts (geofences)
+Parents add up to 10 circular places per child (50 to 2000 m). The server checks every uploaded location against them
+(`app/services/places.py`): enter at the edge, leave only when clearly outside (so GPS drift does not repeat alerts),
+ignore fixes less accurate than 150 m, no alert for the first reading, and no alert for readings older than 30 minutes.
+The child app uploads soon after each location (about every 5 minutes), so alerts arrive within roughly 5 to 10 minutes.
+Indoors or with weak GPS it can take longer; recommend radii of 100 m or more.

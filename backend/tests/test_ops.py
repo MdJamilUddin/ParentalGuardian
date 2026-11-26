@@ -40,3 +40,23 @@ def test_json_log_format():
     record.request_id = "abc"
     data = json.loads(JsonFormatter().format(record))
     assert data["message"] == "GET /x 200" and data["request_id"] == "abc" and data["level"] == "INFO"
+
+
+def test_root_points_to_the_docs(client):
+    r = client.get("/")
+    assert r.status_code == 200 and r.json()["docs"] == "/docs"
+
+
+def _preflight(client, origin):
+    return client.options("/auth/login", headers={"Origin": origin, "Access-Control-Request-Method": "POST",
+                                                  "Access-Control-Request-Headers": "content-type"})
+
+
+def test_local_dashboards_may_call_the_api_outside_production(client):
+    for origin in ("http://localhost:5173", "http://127.0.0.1:5500"):
+        assert _preflight(client, origin).headers["access-control-allow-origin"] == origin
+
+
+def test_other_websites_are_blocked(client):
+    r = _preflight(client, "https://evil.example.org")
+    assert "access-control-allow-origin" not in r.headers

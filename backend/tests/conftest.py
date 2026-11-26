@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import entities  # noqa: E402,F401
 from app.models.db import Base, engine  # noqa: E402
+from app.routes import account as account_routes  # noqa: E402
 from app.routes import auth as auth_routes  # noqa: E402
 from app.routes import device as device_routes  # noqa: E402
 from app.routes import push as push_routes  # noqa: E402
@@ -24,7 +25,7 @@ def fresh_state():
     """Empty database and cleared rate limiters before every test."""
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    for limiter in (auth_routes.login_limit, auth_routes.register_limit, device_routes.pair_limit, push_routes.test_limit):
+    for limiter in (auth_routes.login_limit, auth_routes.register_limit, device_routes.pair_limit, push_routes.test_limit, account_routes.delete_limit):
         limiter.hits.clear()
     yield
 
@@ -37,7 +38,8 @@ def client():
 @pytest.fixture
 def register(client):
     def _register(email="parent1@example.com", password="correct-horse-1", name="Parent"):
-        r = client.post("/auth/register", json={"email": email, "name": name, "password": password})
+        r = client.post("/auth/register", json={"email": email, "name": name, "password": password,
+                                                    "accepted_terms": True})
         assert r.status_code == 201, r.text
         return bearer(r.json()["access_token"])
     return _register

@@ -2,21 +2,21 @@ from util import bearer
 
 
 def test_register_and_login(client):
-    r = client.post("/auth/register", json={"email": "a@example.com", "name": "A", "password": "password123"})
+    r = client.post("/auth/register", json={"email": "a@example.com", "name": "A", "password": "password123", "accepted_terms": True})
     assert r.status_code == 201 and r.json()["access_token"]
     r = client.post("/auth/login", json={"email": "a@example.com", "password": "password123"})
     assert r.status_code == 200 and r.json()["token_type"] == "bearer"
 
 
 def test_email_is_case_insensitive(client):
-    client.post("/auth/register", json={"email": "Mixed@Example.com", "name": "A", "password": "password123"})
+    client.post("/auth/register", json={"email": "Mixed@Example.com", "name": "A", "password": "password123", "accepted_terms": True})
     r = client.post("/auth/login", json={"email": "mixed@example.com", "password": "password123"})
     assert r.status_code == 200
 
 
 def test_duplicate_email_rejected(client, register):
     register("dup@example.com")
-    r = client.post("/auth/register", json={"email": "dup@example.com", "name": "B", "password": "password123"})
+    r = client.post("/auth/register", json={"email": "dup@example.com", "name": "B", "password": "password123", "accepted_terms": True})
     assert r.status_code == 409
 
 
@@ -32,7 +32,7 @@ def test_unknown_email_rejected(client):
 
 
 def test_short_password_rejected(client):
-    r = client.post("/auth/register", json={"email": "a@example.com", "name": "A", "password": "short"})
+    r = client.post("/auth/register", json={"email": "a@example.com", "name": "A", "password": "short", "accepted_terms": True})
     assert r.status_code == 422
 
 
