@@ -1,2 +1,2 @@
 // Address of your ParentalGuardian backend (use https in production).
-window.GUARDIAN_API = "http://localhost:8000";
+window.GUARDIAN_API = "https://parentalguardian.onrender.com";
