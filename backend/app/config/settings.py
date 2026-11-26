@@ -21,13 +21,15 @@ class Settings:
     LOW_BATTERY_PERCENT = int(os.getenv("LOW_BATTERY_PERCENT", "15"))
     LOW_BATTERY_RESET_PERCENT = int(os.getenv("LOW_BATTERY_RESET_PERCENT", "30"))
     ALERT_CHECK_SECONDS = int(os.getenv("ALERT_CHECK_SECONDS", "300"))  # 0 = no in-process checker
+    TERMS_VERSION = os.getenv("TERMS_VERSION", "2026-11")  # bump when the privacy policy or terms change
     AUTO_MIGRATE = os.getenv("AUTO_MIGRATE", "true").lower() in ("1", "true", "yes")
     DATABASE_URL = normalize_database_url(os.getenv("DATABASE_URL", "sqlite:///./guardian.db"))
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
     ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "60"))
     PAIRING_CODE_MINUTES = int(os.getenv("PAIRING_CODE_MINUTES", "10"))
     RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "30"))
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+    CORS_ORIGINS = [o.strip().rstrip("/") for o in
+                    os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",") if o.strip()]
 
 
 settings = Settings()

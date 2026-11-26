@@ -20,6 +20,9 @@ class Parent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     notify_offline: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     notify_low_battery: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    notify_places: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    terms_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     children: Mapped[list["Child"]] = relationship(back_populates="parent", cascade="all, delete-orphan")
 
 
@@ -30,6 +33,7 @@ class Child(Base):
     name: Mapped[str] = mapped_column(String(100))
     parent: Mapped[Parent] = relationship(back_populates="children")
     devices: Mapped[list["Device"]] = relationship(back_populates="child", cascade="all, delete-orphan")
+    places: Mapped[list["Place"]] = relationship(back_populates="child", cascade="all, delete-orphan")
 
 
 class Device(Base):
@@ -107,3 +111,23 @@ class PushToken(Base):
     platform: Mapped[str] = mapped_column(String(20), default="android")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Place(Base):
+    """A circle (home, school ...) the parent wants arrive/leave alerts for."""
+    __tablename__ = "places"
+    __table_args__ = (
+        CheckConstraint("lat BETWEEN -90 AND 90", name="ck_place_lat"),
+        CheckConstraint("lng BETWEEN -180 AND 180", name="ck_place_lng"),
+        CheckConstraint("radius_m BETWEEN 50 AND 2000", name="ck_place_radius"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+    radius_m: Mapped[int] = mapped_column(Integer)
+    inside: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # None = not known yet
+    state_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    child: Mapped[Child] = relationship(back_populates="places")

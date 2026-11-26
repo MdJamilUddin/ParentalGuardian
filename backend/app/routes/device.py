@@ -8,6 +8,7 @@ from ..models.db import get_db
 from ..models.entities import BatteryReading, Device, LocationPoint, UsageRecord, utcnow
 from ..models.schemas import PairIn, PairOut, SyncIn, SyncOut
 from ..services import alerts, push
+from ..services import places as places_service
 from ..services.pairing import redeem_pairing_code
 from ..services.ratelimit import RateLimiter
 
@@ -42,6 +43,12 @@ def sync(body: SyncIn, background: BackgroundTasks, device: Device = Depends(cur
             db.add(UsageRecord(device_id=device.id, package=u.package, app_label=u.app_label,
                                day=u.day, seconds=u.seconds))
 
+    place_alerts = []
+    if body.locations:
+        place_alerts = places_service.evaluate(device.child, [
+            places_service.Point(p.lat, p.lng, p.accuracy_m, alerts.to_naive_utc(p.recorded_at))
+            for p in body.locations])
+
     low_battery_message = None
     if body.battery:
         newest = max(body.battery, key=lambda b: alerts.to_naive_utc(b.recorded_at))
@@ -49,11 +56,15 @@ def sync(body: SyncIn, background: BackgroundTasks, device: Device = Depends(cur
             device, newest.level, newest.charging, alerts.to_naive_utc(newest.recorded_at))
     parent = device.child.parent
     notify, parent_id, child_name, child_id = parent.notify_low_battery, parent.id, device.child.name, device.child_id
+    notify_places = parent.notify_places
 
     db.commit()
     if low_battery_message and notify:
         background.add_task(push.push_to_parent, parent_id, f"{child_name}: battery is low",
                             low_battery_message, {"type": "low_battery", "child_id": child_id})
+    if notify_places:
+        for a in place_alerts:
+            background.add_task(push.push_to_parent, parent_id, a["title"], a["body"], a["data"])
     log.info("sync device=%s locations=%d usage=%d battery=%d", device.id,
              len(body.locations), len(body.usage), len(body.battery))
     return SyncOut(accepted_locations=len(body.locations), accepted_usage=len(body.usage),

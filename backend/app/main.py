@@ -13,7 +13,7 @@ from .config.settings import settings
 from .logging_config import setup_logging
 from .migrate import run_migrations
 from .models.db import SessionLocal, get_db
-from .routes import auth, children, device, internal, push
+from .routes import account, auth, children, device, internal, places, push
 from .services.alerts import run_alert_check
 from .services.retention import purge_old_data
 
@@ -49,7 +49,11 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="ParentalGuardian API", version="0.2.0", lifespan=lifespan)
+# Outside production, dashboards served from your own computer (any port) may call the API. Logins use
+# bearer tokens, not cookies, so this does not expose anyone's session.
+LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 app.add_middleware(CORSMiddleware, allow_origins=settings.CORS_ORIGINS,
+                   allow_origin_regex=None if settings.ENVIRONMENT == "production" else LOCAL_ORIGIN_REGEX,
                    allow_methods=["*"], allow_headers=["*"])
 
 
@@ -78,12 +82,17 @@ async def access_logging(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(children.router)
 app.include_router(device.router)
+app.include_router(places.router)
 app.include_router(push.router)
+app.include_router(account.router)
 app.include_router(internal.router)
+
 
 @app.get("/", include_in_schema=False)
 def root():
     return {"service": "ParentalGuardian API", "docs": "/docs", "health": "/health/ready"}
+
+
 @app.get("/health")
 def health():
     """Liveness: the process is up."""

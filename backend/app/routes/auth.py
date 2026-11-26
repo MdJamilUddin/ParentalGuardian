@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from ..auth.security import create_access_token, hash_password, verify_password
 from ..models.db import get_db
-from ..models.entities import Parent
+from ..config.settings import settings
+from ..models.entities import Parent, utcnow
 from ..models.schemas import LoginIn, RegisterIn, TokenOut
 from ..services.ratelimit import RateLimiter
 
@@ -21,7 +22,8 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
     email = body.email.lower()
     if db.query(Parent).filter(Parent.email == email).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
-    parent = Parent(email=email, name=body.name, password_hash=hash_password(body.password))
+    parent = Parent(email=email, name=body.name, password_hash=hash_password(body.password),
+                    terms_accepted_at=utcnow(), terms_version=settings.TERMS_VERSION)
     db.add(parent)
     db.commit()
     return TokenOut(access_token=create_access_token(parent.id))

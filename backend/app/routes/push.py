@@ -24,9 +24,13 @@ class TokenOnly(BaseModel):
 class PrefsIn(BaseModel):
     offline: bool
     low_battery: bool
+    places: bool | None = None  # older app versions don't send it
 
 
-class PrefsOut(PrefsIn):
+class PrefsOut(BaseModel):
+    offline: bool
+    low_battery: bool
+    places: bool
     devices: int
 
 
@@ -48,7 +52,8 @@ def unregister_token(body: TokenOnly, parent: Parent = Depends(current_parent), 
 
 def _prefs(parent: Parent, db: Session) -> PrefsOut:
     n = db.query(PushToken).filter(PushToken.parent_id == parent.id).count()
-    return PrefsOut(offline=parent.notify_offline, low_battery=parent.notify_low_battery, devices=n)
+    return PrefsOut(offline=parent.notify_offline, low_battery=parent.notify_low_battery,
+                    places=parent.notify_places, devices=n)
 
 
 @router.get("/notifications", response_model=PrefsOut)
@@ -59,6 +64,8 @@ def get_prefs(parent: Parent = Depends(current_parent), db: Session = Depends(ge
 @router.put("/notifications", response_model=PrefsOut)
 def set_prefs(body: PrefsIn, parent: Parent = Depends(current_parent), db: Session = Depends(get_db)):
     parent.notify_offline, parent.notify_low_battery = body.offline, body.low_battery
+    if body.places is not None:
+        parent.notify_places = body.places
     db.commit()
     return _prefs(parent, db)
 
