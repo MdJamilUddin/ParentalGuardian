@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parental Guardian</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
@@ -58,6 +59,7 @@ main{padding:2rem clamp(1rem,4vw,3rem);max-width:1100px}
 dialog{border:0;border-radius:8px;padding:1.5rem;max-width:380px;width:calc(100% - 2rem)}
 dialog::backdrop{background:rgba(11,59,60,.55)}
 .code{font-size:2.75rem;font-weight:700;letter-spacing:.25em;margin:.5rem 0}
+input[type=range]{width:100%}
 .actions{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.25rem}
 @media (max-width:760px){
   .shell{grid-template-columns:1fr}
@@ -79,12 +81,14 @@ dialog::backdrop{background:rgba(11,59,60,.55)}
     <label for="email">Email</label>
     <input id="email" type="email" autocomplete="email" required>
     <div id="nameRow" hidden><label for="name">Your name</label><input id="name" type="text" autocomplete="name"></div>
+    <div id="termsRow" hidden><label style="display:flex;gap:.5rem;align-items:flex-start;font-weight:400"><input id="terms" type="checkbox" style="margin-top:.35rem"><span>I am the parent or legal guardian of the children I will add, and I accept the <a href="privacy.html" target="_blank" rel="noopener">privacy policy</a> and <a href="terms.html" target="_blank" rel="noopener">terms</a>.</span></label></div>
     <label for="password">Password</label>
     <input id="password" type="password" minlength="8" autocomplete="current-password" required>
     <p class="err" id="authErr" role="alert"></p>
     <button class="btn" id="authSubmit" type="submit">Log in</button>
     <button class="link" id="toggleAuth" type="button">Create a new account</button>
   </form>
+  <p class="muted" style="margin-top:2rem"><a href="privacy.html">Privacy policy</a> · <a href="terms.html">Terms</a></p>
 </section>
 
 <div class="shell" id="app" hidden>
@@ -93,6 +97,7 @@ dialog::backdrop{background:rgba(11,59,60,.55)}
     <nav id="kids" aria-label="Children"></nav>
     <button class="btn" id="addKid">Add child</button>
     <button class="link" id="logout">Log out</button>
+    <button class="link" id="deleteAccount">Delete account</button>
   </aside>
   <main>
     <p class="err" id="err" role="alert"></p>
@@ -111,6 +116,20 @@ dialog::backdrop{background:rgba(11,59,60,.55)}
         <div><span class="muted">Last location</span><b id="seen">–</b></div>
       </div>
       <div id="map" role="img" aria-label="Map of your child's recent movements"></div>
+      <section id="placesBox" style="margin-top:2rem">
+        <h2>Places</h2>
+        <p class="muted">Get an alert when your child arrives at or leaves a place (alerts go to the parent app).</p>
+        <div id="places"></div>
+        <button class="btn ghost" id="addPlace" type="button">Add a place</button>
+        <form id="placeForm" hidden style="max-width:420px">
+          <p class="muted">Click the map to choose the spot.</p>
+          <label for="placeName">Name (for example Home, School)</label>
+          <input id="placeName" type="text" maxlength="60" required>
+          <label for="placeRadius">Radius: <span id="placeRadiusVal">150</span> m</label>
+          <input id="placeRadius" type="range" min="50" max="500" step="10" value="150">
+          <div class="actions"><button class="btn ghost" type="button" id="placeCancel">Cancel</button><button class="btn" type="submit">Save place</button></div>
+        </form>
+      </section>
       <div class="cols">
         <section><h2>App usage today</h2><div id="usage"></div></section>
         <section><h2>Phones</h2><div id="devices"></div></section>
@@ -124,6 +143,20 @@ dialog::backdrop{background:rgba(11,59,60,.55)}
   <div class="code" id="codeVal"></div>
   <p class="muted">Enter this in the child app within 10 minutes. It works once.</p>
   <div class="actions"><button class="btn" id="codeClose">Done</button></div>
+</dialog>
+
+<dialog id="delDlg">
+  <form method="dialog" id="delForm">
+    <h2>Delete account</h2>
+    <p>This permanently deletes your account, your children’s data and the data of every connected phone. It cannot be undone.</p>
+    <label for="delPw">Your password</label>
+    <input id="delPw" type="password" autocomplete="current-password" required>
+    <p class="err" id="delErr" role="alert"></p>
+    <div class="actions">
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn" value="ok" style="background:var(--bad)">Delete everything</button>
+    </div>
+  </form>
 </dialog>
 
 <dialog id="kidDlg">
@@ -157,13 +190,13 @@ const when = s => { const d = utc(s); return d ? d.toLocaleString([], {day:"nume
 const dur = sec => { const hr = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return hr ? hr + "h " + m + "m" : m ? m + "m" : "<1m"; };
 
 const STALE_MS = 2 * 3600 * 1000; // warn when a phone has not reported for 2 hours
-let token = localStorage.getItem("pg_token"), children = [], current = null, map, layer, centred = false, timer, registerMode = false;
+let token = localStorage.getItem("pg_token"), children = [], current = null, map, layer, centred = false, timer, registerMode = false, places = [], picking = false, pickPoint = null, pickLayer;
 
 async function api(path, opts = {}) {
   const r = await fetch(API + path, {...opts, headers: {"Content-Type": "application/json", ...(token ? {Authorization: "Bearer " + token} : {})}});
   if (r.status === 401 && token) { logout(); throw new Error("Your session expired. Log in again."); }
   if (!r.ok) {
-    const msg = {401: "Wrong email or password.", 409: "That email is already registered.", 422: "Check the details. The password needs 8 or more characters.", 429: "Too many attempts. Wait a few minutes and try again."}[r.status];
+    const msg = {401: "Wrong email or password.", 409: "That email is already registered.", 422: "Check the details. The password needs 8 or more characters.", 429: "Too many attempts. Wait a few minutes and try again.", 400: "That isn’t allowed (a child can have at most 10 places).", 403: "Wrong password."}[r.status];
     throw new Error(msg || "Something went wrong (" + r.status + ").");
   }
   return r.status === 204 ? null : r.json();
@@ -173,6 +206,7 @@ const post = (path, body) => api(path, {method: "POST", body: body ? JSON.string
 // ---- auth
 function syncAuth() {
   $("#nameRow").hidden = !registerMode;
+  $("#termsRow").hidden = !registerMode;
   $("#authSubmit").textContent = registerMode ? "Create account" : "Log in";
   $("#toggleAuth").textContent = registerMode ? "I already have an account" : "Create a new account";
   $("#password").autocomplete = registerMode ? "new-password" : "current-password";
@@ -181,9 +215,10 @@ $("#toggleAuth").onclick = () => { registerMode = !registerMode; $("#authErr").t
 $("#authForm").onsubmit = async e => {
   e.preventDefault();
   $("#authErr").textContent = "";
+  if (registerMode && !$("#terms").checked) { $("#authErr").textContent = "Please accept the privacy policy and terms."; return; }
   try {
     const body = {email: $("#email").value.trim(), password: $("#password").value};
-    if (registerMode) body.name = $("#name").value.trim() || "Parent";
+    if (registerMode) { body.name = $("#name").value.trim() || "Parent"; body.accepted_terms = true; }
     const r = await post(registerMode ? "/auth/register" : "/auth/login", body);
     token = r.access_token; localStorage.setItem("pg_token", token);
     $("#password").value = "";
@@ -214,7 +249,7 @@ async function loadKids() {
   renderKids();
 }
 function select(id) {
-  current = children.find(c => c.id === id); centred = false;
+  current = children.find(c => c.id === id); centred = false; endPick();
   $("#kid").hidden = false; $("#empty").hidden = true;
   renderKids(); refresh();
 }
@@ -234,18 +269,19 @@ async function refresh() {
   if (!current) return;
   const id = current.id, day = new Date().toLocaleDateString("en-CA"); // local YYYY-MM-DD, matches the child app
   try {
-    const [kids, latest, hist, usage, bat] = await Promise.all([
+    const [kids, latest, hist, usage, bat, plc] = await Promise.all([
       api("/children"), api(`/children/${id}/location/latest`), api(`/children/${id}/locations?hours=24`),
-      api(`/children/${id}/usage?day=${day}`), api(`/children/${id}/battery`)
+      api(`/children/${id}/usage?day=${day}`), api(`/children/${id}/battery`), api(`/children/${id}/places`)
     ]);
     if (!current || current.id !== id) return;
     children = kids; current = kids.find(c => c.id === id) || current;
-    renderKids(); renderKid(latest, hist, usage, bat); setErr("");
+    renderKids(); places = plc; renderKid(latest, hist, usage, bat); setErr("");
   } catch (err) { setErr(err.message); }
 }
 
 function renderKid(latest, hist, usage, bat) {
   $("#kidName").textContent = current.name;
+  renderPlaces();
   $("#batt").textContent = bat ? bat.level + "%" + (bat.charging ? " charging" : "") : "No data yet";
   $("#battBar").hidden = !bat;
   if (bat) { const i = $("#battBar i"); i.style.width = bat.level + "%"; i.className = bat.level <= 20 && !bat.charging ? "low" : ""; }
@@ -256,8 +292,14 @@ function renderKid(latest, hist, usage, bat) {
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap contributors"}).addTo(map);
     layer = L.layerGroup().addTo(map);
     map.setView([23.8, 90.4], 7); // Bangladesh until a location arrives
+    pickLayer = L.layerGroup().addTo(map);
+    map.on("click", e => { if (picking) { pickPoint = e.latlng; drawPick(); } });
   }
   layer.clearLayers();
+  places.forEach(p => {
+    const tip = document.createElement("span"); tip.textContent = p.name; // text, never HTML
+    L.circle([p.lat, p.lng], {radius: p.radius_m, color: "#E3A21A", weight: 2, fillOpacity: .12}).bindTooltip(tip).addTo(layer);
+  });
   if (latest) {
     const here = [latest.lat, latest.lng];
     if (hist.length > 1) L.polyline(hist.slice().reverse().map(p => [p.lat, p.lng]), {color: "#0E6B6B", weight: 4, opacity: .7}).addTo(layer);
@@ -301,6 +343,49 @@ $("#pair").onclick = async () => {
   catch (err) { setErr(err.message); }
 };
 $("#codeClose").onclick = () => { $("#codeDlg").close(); refresh(); };
+
+function renderPlaces() {
+  const box = $("#places"); box.replaceChildren();
+  if (!places.length) box.append(h("p", {class: "muted"}, "No places yet."));
+  places.forEach(p => box.append(h("div", {class: "dev"},
+    h("span", {}, p.name, h("br"), h("small", {class: "muted"}, p.radius_m + " m" + (p.inside === true ? " · your child is here" : ""))),
+    h("button", {class: "link", type: "button", onclick: async () => {
+      if (!confirm("Remove " + p.name + "?")) return;
+      try { await api("/places/" + p.id, {method: "DELETE"}); refresh(); } catch (err) { setErr(err.message); }
+    }}, "Remove"))));
+  $("#addPlace").disabled = places.length >= 10;
+}
+function drawPick() {
+  if (!pickLayer) return;
+  pickLayer.clearLayers();
+  if (!pickPoint) return;
+  L.circle(pickPoint, {radius: +$("#placeRadius").value, color: "#B3392F", weight: 2, fillOpacity: .15}).addTo(pickLayer);
+  L.circleMarker(pickPoint, {radius: 5, color: "#B3392F"}).addTo(pickLayer);
+}
+function endPick() {
+  picking = false; pickPoint = null;
+  $("#placeForm").hidden = true; $("#placeForm").reset(); $("#placeRadiusVal").textContent = "150";
+  if (pickLayer) pickLayer.clearLayers();
+}
+$("#addPlace").onclick = () => { picking = true; pickPoint = null; $("#placeForm").hidden = false; $("#placeName").focus(); };
+$("#placeRadius").oninput = () => { $("#placeRadiusVal").textContent = $("#placeRadius").value; drawPick(); };
+$("#placeCancel").onclick = endPick;
+$("#placeForm").onsubmit = async e => {
+  e.preventDefault();
+  if (!pickPoint) { setErr("Click the map to choose the spot first."); return; }
+  try {
+    await post(`/children/${current.id}/places`, {name: $("#placeName").value.trim(), lat: pickPoint.lat, lng: pickPoint.lng, radius_m: +$("#placeRadius").value});
+    endPick(); setErr(""); refresh();
+  } catch (err) { setErr(err.message); }
+};
+
+$("#deleteAccount").onclick = () => { $("#delPw").value = ""; $("#delErr").textContent = ""; $("#delDlg").showModal(); };
+$("#delForm").onsubmit = async e => {
+  if (e.submitter && e.submitter.value !== "ok") return; // Cancel closes the dialog
+  e.preventDefault(); // otherwise the dialog would close before we know the result
+  try { await post("/me/delete", {password: $("#delPw").value}); $("#delDlg").close(); logout(); }
+  catch (err) { $("#delErr").textContent = err.message; }
+};
 
 async function start() {
   $("#auth").hidden = true; $("#app").hidden = false;
