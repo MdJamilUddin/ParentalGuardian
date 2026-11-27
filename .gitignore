@@ -1,50 +1,29 @@
-# ---------- Python ----------
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
 .Python
 .venv/
 venv/
 env/
-ENV/
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 
-# ---------- Database ----------
+# Database
 *.db
-*.sqlite
 *.sqlite3
-guardian.db
+*.sqlite
 
-# ---------- Env / Secrets ----------
+# Env / secrets
 .env
 .env.*
 !.env.example
 
-# ---------- Logs ----------
+# Logs
 *.log
-logs/
 
-# ---------- IDE ----------
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# ---------- OS ----------
+# OS
 .DS_Store
 Thumbs.db
-
-# ---------- Build / Deploy ----------
-dist/
-build/
-*.apk
-*.aab
-.gradle/
-local.properties
-
-# ---------- Node (parent-web) ----------
-node_modules/

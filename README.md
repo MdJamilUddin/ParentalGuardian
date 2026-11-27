@@ -1,22 +1,43 @@
-# ParentalGuardian
+# ParentalGuardian backend (FastAPI)
 
-A family safety system: the child's Android phone shares location, app usage time and battery level with the
-parent, who views it in an Android app or a web dashboard. The child app is visible and shows a permanent
-notification while active.
+    cd backend
+    python -m venv .venv && source .venv/bin/activate
+    pip install -r requirements.txt
+    export SECRET_KEY="$(python -c 'import secrets;print(secrets.token_hex(32))')"
+    uvicorn app.main:app --reload
 
-    backend/         FastAPI API (auth, pairing, sync, reports), rate limits, retention
-    database/        PostgreSQL schema, retention SQL, Alembic notes
-    child-android/   Kotlin app: pairing, location, battery, usage, offline queue, sync
-    parent-android/  Kotlin app: login, children, map, usage, battery, pairing codes
-    parent-web/      Browser dashboard (same features)
-    deployment/      Docker Compose + Caddy (HTTPS), server setup script, backups, monitoring (STAGING.md, MONITORING.md)
+Docs: http://localhost:8000/docs
 
-## Run locally (development)
-1. Backend: see `backend/README.md` (SQLite, no setup). API docs at http://localhost:8000/docs
-2. Dashboard: `cd parent-web/dashboard && python3 -m http.server 5173`, open http://localhost:5173
-3. Android apps: open `child-android` and `parent-android` in Android Studio, run on the emulator.
-   Debug builds talk to `http://10.0.2.2:8000`.
-4. Parent: create an account, add a child, "Add a phone" -> 6-digit code -> enter it in the child app.
+## Flow
+1. Parent: POST /auth/register -> token
+2. Parent: POST /children, then POST /children/{id}/pairing-code (6 digits, 10 min, single use)
+3. Child app: POST /device/pair {code, device_name} -> device_token (store securely)
+4. Child app: POST /device/sync with Bearer device_token (batches of locations, usage, battery)
+5. Parent: GET /children/{id}/location/latest | /locations | /usage | /battery
+6. Parent: DELETE /devices/{id} revokes a device
 
-## Go live
-See `deployment/README.md`.
+Env: DATABASE_URL (PostgreSQL in production), SECRET_KEY (required in production),
+RETENTION_DAYS (default 30), CORS_ORIGINS.
+
+## Tests
+    pip install -r requirements-dev.txt
+    pytest -q
+Tests use a temporary SQLite database and never touch `guardian.db`. They run automatically on GitHub via
+`.github/workflows/backend-tests.yml`.
+
+## Database migrations
+Tables are created and updated by Alembic (`migrations/`). The app runs `alembic upgrade head` on startup;
+set `AUTO_MIGRATE=false` to disable. An old development `guardian.db` created before migrations existed is
+adopted automatically. After changing a model run `alembic revision --autogenerate -m "message"`.
+See `../database/README.md`.
+
+## Push notifications
+Parents get alerts when a phone stops reporting (2 h) or its battery is low (15%). Needs a Firebase project, see
+`../deployment/FIREBASE.md`. Without credentials the backend runs normally and just logs the alerts it would send.
+
+## Place alerts (geofences)
+Parents add up to 10 circular places per child (50 to 2000 m). The server checks every uploaded location against them
+(`app/services/places.py`): enter at the edge, leave only when clearly outside (so GPS drift does not repeat alerts),
+ignore fixes less accurate than 150 m, no alert for the first reading, and no alert for readings older than 30 minutes.
+The child app uploads soon after each location (about every 5 minutes), so alerts arrive within roughly 5 to 10 minutes.
+Indoors or with weak GPS it can take longer; recommend radii of 100 m or more.
